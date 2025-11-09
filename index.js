@@ -1,84 +1,162 @@
-const express = require('express')
-const cors = require('cors')
-const app = express()
-const port = process.env.PORT || 3000
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const express = require("express");
+const cors = require("cors");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
-const uri = "mongodb+srv://FinEase:j1YX3lA1qat0Z42P@cluster0.c0vwcej.mongodb.net/?appName=Cluster0";
+const app = express();
+const port = process.env.PORT || 3000;
+
+// 🔗 MongoDB connection URI
+const uri =
+  "mongodb+srv://FinEase:j1YX3lA1qat0Z42P@cluster0.c0vwcej.mongodb.net/?appName=Cluster0";
+
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
-  }
+  },
 });
 
-app.use(cors())
-app.use(express.json())
+// 🧩 Middleware
+app.use(cors());
+app.use(express.json());
 
-app.get('/', (req, res) => {
-  res.send('Hello World!')
-})
-// j1YX3lA1qat0Z42P
+// ✅ Test route
+app.get("/", (req, res) => {
+  res.send("FinEase Server is Running ✅");
+});
+
 async function run() {
   try {
-    // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
-     const db = client.db("FinEaseDB");
+    const db = client.db("FinEaseDB");
     const transactions = db.collection("transactions");
 
-    app.get('/transactions', async (req, res) => {
-  try {
-   
-    const allTransactions = await transactions.find({}).toArray();
-    console.log(allTransactions.length);
-    
+    // ✅ Get all transactions
+    app.get("/transactions", async (req, res) => {
+      try {
+        const allTransactions = await transactions.find({}).toArray();
+        res.json(allTransactions);
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error" });
+      }
+    });
 
-    const totalIncome = allTransactions
-      .filter(t => t.type === "Income")
-      .reduce((sum, t) => sum + t.amount, 0);
+    // ✅ Get overview summary (total income, expenses, balance)
+    app.get("/overview", async (req, res) => {
+      try {
+        const allTransactions = await transactions.find({}).toArray();
 
-    const totalExpenses = allTransactions
-      .filter(t => t.type === "Expense")
-      .reduce((sum, t) => sum + t.amount, 0);
+        const totalIncome = allTransactions
+          .filter((t) => t.type === "Income")
+          .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-    const totalBalance = totalIncome - totalExpenses;
+        const totalExpenses = allTransactions
+          .filter((t) => t.type === "Expense")
+          .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-    res.json({ totalIncome, totalExpenses, totalBalance });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }
-});
+        const totalBalance = totalIncome - totalExpenses;
 
-// post transaction
-app.post('/transactions', async (req, res) => {
-  try {
-    const { amount, type, category, date, description } = req.body;
+        res.json({ totalIncome, totalExpenses, totalBalance });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error" });
+      }
+    });
 
-    await transactions.insertOne({ amount, type, category, date, description });
+    // ✅ Post (Add new transaction)
+    app.post("/transactions", async (req, res) => {
+      try {
+        const { amount, type, category, date, description, userEmail } = req.body;
 
-    res.json({ message: "Transaction added successfully" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }
-});
+        if (!amount || !type || !category || !date || !userEmail) {
+          return res.status(400).json({ message: "Missing required fields" });
+        }
 
+        await transactions.insertOne({
+          amount: Number(amount),
+          type,
+          category,
+          date,
+          description,
+          userEmail,
+        });
 
+        res.json({ message: "Transaction added successfully" });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error" });
+      }
+    });
 
+    // ✅ Delete transaction
+    app.delete("/transactions/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const result = await transactions.deleteOne({ _id: new ObjectId(id) });
 
-    // Send a ping to confirm a successful connection
+        if (result.deletedCount === 1) {
+          res.json({ message: "Transaction deleted successfully" });
+        } else {
+          res.status(404).json({ message: "Transaction not found" });
+        }
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error" });
+      }
+    });
+
+    // ✅ Get single transaction (for View Details)
+    app.get("/transactions/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const transaction = await transactions.findOne({ _id: new ObjectId(id) });
+
+        if (!transaction) {
+          return res.status(404).json({ message: "Transaction not found" });
+        }
+
+        res.json(transaction);
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error" });
+      }
+    });
+
+    // ✅ Update transaction
+    app.put("/transactions/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const updatedData = req.body;
+
+        const result = await transactions.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: updatedData }
+        );
+
+        if (result.modifiedCount === 1) {
+          res.json({ message: "Transaction updated successfully" });
+        } else {
+          res.status(404).json({ message: "Transaction not found" });
+        }
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error" });
+      }
+    });
+
+    // ✅ Ping test
     await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    console.log("✅ MongoDB connected successfully!");
   } finally {
-    // Ensures that the client will close when you finish/error
-    // await client.close();
+    // keep the connection open
   }
 }
+
 run().catch(console.dir);
 
-
+// 🚀 Server listening
 app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`)
-})
+  console.log(`🚀 FinEase Server running on port ${port}`);
+});
