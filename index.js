@@ -27,19 +27,19 @@ async function run() {
      const db = client.db("FinEaseDB");
     const transactions = db.collection("transactions");
 
-    app.get('/api/overview', async (req, res) => {
+    app.get('/transactions', async (req, res) => {
   try {
-    const db = client.db("FinEaseDB");
-    const transactions = db.collection("transactions");
-
+   
     const allTransactions = await transactions.find({}).toArray();
+    console.log(allTransactions.length);
+    
 
     const totalIncome = allTransactions
-      .filter(t => t.type === "income")
+      .filter(t => t.type === "Income")
       .reduce((sum, t) => sum + t.amount, 0);
 
     const totalExpenses = allTransactions
-      .filter(t => t.type === "expense")
+      .filter(t => t.type === "Expense")
       .reduce((sum, t) => sum + t.amount, 0);
 
     const totalBalance = totalIncome - totalExpenses;
