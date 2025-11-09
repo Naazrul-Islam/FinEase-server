@@ -125,7 +125,27 @@ async function run() {
     });
 
     // ✅ Update transaction
-    
+    app.put("/transactions/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const updatedData = req.body;
+
+        const result = await transactions.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: updatedData }
+        );
+
+        if (result.modifiedCount === 1) {
+          res.json({ message: "Transaction updated successfully" });
+        } else {
+          res.status(404).json({ message: "Transaction not found" });
+        }
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error" });
+      }
+    });
+
     // ✅ Ping test
     await client.db("admin").command({ ping: 1 });
     console.log("✅ MongoDB connected successfully!");
