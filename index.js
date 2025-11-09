@@ -91,21 +91,7 @@ async function run() {
     });
 
     // ✅ Delete transaction
-    app.delete("/transactions/:id", async (req, res) => {
-      try {
-        const id = req.params.id;
-        const result = await transactions.deleteOne({ _id: new ObjectId(id) });
-
-        if (result.deletedCount === 1) {
-          res.json({ message: "Transaction deleted successfully" });
-        } else {
-          res.status(404).json({ message: "Transaction not found" });
-        }
-      } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: "Server error" });
-      }
-    });
+    
 
     // ✅ Get single transaction (for View Details)
     app.get("/transactions/:id", async (req, res) => {
