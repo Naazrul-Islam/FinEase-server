@@ -26,7 +26,7 @@ async function run() {
     await client.connect();
      const db = client.db("FinEaseDB");
     const transactions = db.collection("transactions");
-    
+
     app.get('/api/overview', async (req, res) => {
   try {
     const db = client.db("FinEaseDB");
@@ -45,6 +45,20 @@ async function run() {
     const totalBalance = totalIncome - totalExpenses;
 
     res.json({ totalIncome, totalExpenses, totalBalance });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// post transaction
+app.post('/transactions', async (req, res) => {
+  try {
+    const { amount, type, category, date, description } = req.body;
+
+    await transactions.insertOne({ amount, type, category, date, description });
+
+    res.json({ message: "Transaction added successfully" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
