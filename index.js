@@ -33,7 +33,7 @@ async function run() {
     const transactions = db.collection("transactions");
 
     // ✅ Get all transactions
-    app.get("/transactions", async (req, res) => {
+    app.get("/my-transactions", async (req, res) => {
       try {
         const allTransactions = await transactions.find({}).toArray();
         res.json(allTransactions);
@@ -66,7 +66,7 @@ async function run() {
     });
 
     // ✅ Post (Add new transaction)
-    app.post("/transactions", async (req, res) => {
+    app.post("/add-transactions", async (req, res) => {
       try {
         const { amount, type, category, date, description, userEmail } = req.body;
 
@@ -91,6 +91,21 @@ async function run() {
     });
 
     // ✅ Delete transaction
+    app.delete("/transactions/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const result = await transactions.deleteOne({ _id: new ObjectId(id) });
+
+        if (result.deletedCount === 1) {
+          res.json({ message: "Transaction deleted successfully" });
+        } else {
+          res.status(404).json({ message: "Transaction not found" });
+        }
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error" });
+      }
+    });
     
 
     // ✅ Get single transaction (for View Details)
@@ -111,7 +126,7 @@ async function run() {
     });
 
     // ✅ Update transaction
-    app.put("/transactions/:id", async (req, res) => {
+    app.put("/transactions/update/:id", async (req, res) => {
       try {
         const id = req.params.id;
         const updatedData = req.body;
