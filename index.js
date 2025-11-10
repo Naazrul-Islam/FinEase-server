@@ -91,7 +91,21 @@ async function run() {
     });
 
     // ✅ Delete transaction
-    
+    app.delete("/transactions/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const result = await transactions.deleteOne({ _id: new ObjectId(id) });
+
+        if (result.deletedCount === 1) {
+          res.json({ message: "Transaction deleted successfully" });
+        } else {
+          res.status(404).json({ message: "Transaction not found" });
+        }
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error" });
+      }
+    });
     
 
     // ✅ Get single transaction (for View Details)
@@ -132,6 +146,60 @@ async function run() {
         res.status(500).json({ message: "Server error" });
       }
     });
+
+    // ✅ Reports API (Summary + Charts)
+app.get("/reports/:email", async (req, res) => {
+  try {
+    const { email } = req.params;
+    const { month } = req.query; // optional: ?month=2025-11
+
+    // build query
+    const query = { userEmail: email };
+    if (month) {
+      // Filter transactions by month (e.g., "2025-11")
+      query.date = { $regex: `^${month}` };
+    }
+
+    const allTransactions = await transactions.find(query).toArray();
+
+    // 🧮 Category summary (for Pie Chart)
+    const categorySummary = {};
+    allTransactions.forEach((t) => {
+      const cat = t.category || "Uncategorized";
+      categorySummary[cat] = (categorySummary[cat] || 0) + Number(t.amount || 0);
+    });
+
+    // 🧮 Monthly totals (for Bar Chart)
+    const monthlySummary = {};
+    allTransactions.forEach((t) => {
+      const monthKey = t.date.slice(0, 7); // YYYY-MM
+      monthlySummary[monthKey] = (monthlySummary[monthKey] || 0) + Number(t.amount || 0);
+    });
+
+    // 🧮 Totals
+    const totalIncome = allTransactions
+      .filter((t) => t.type === "Income")
+      .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+    const totalExpenses = allTransactions
+      .filter((t) => t.type === "Expense")
+      .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+    const totalBalance = totalIncome - totalExpenses;
+
+    res.json({
+      totalIncome,
+      totalExpenses,
+      totalBalance,
+      categorySummary,
+      monthlySummary,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 
     // ✅ Ping test
     await client.db("admin").command({ ping: 1 });
