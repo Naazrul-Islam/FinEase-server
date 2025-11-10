@@ -5,7 +5,6 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 3000;
 
-// 🔗 MongoDB connection URI
 const uri =
   "mongodb+srv://FinEase:j1YX3lA1qat0Z42P@cluster0.c0vwcej.mongodb.net/?appName=Cluster0";
 
@@ -17,11 +16,9 @@ const client = new MongoClient(uri, {
   },
 });
 
-// 🧩 Middleware
 app.use(cors());
 app.use(express.json());
 
-// ✅ Test route
 app.get("/", (req, res) => {
   res.send("FinEase Server is Running ✅");
 });
@@ -32,10 +29,23 @@ async function run() {
     const db = client.db("FinEaseDB");
     const transactions = db.collection("transactions");
 
-    // ✅ Get all transactions
+    //  Get all transactions with optional sorting
     app.get("/my-transactions", async (req, res) => {
       try {
-        const allTransactions = await transactions.find({}).toArray();
+        const { sortBy = "date", order = "desc", userEmail } = req.query;
+
+        // Build sort object
+        let sort = {};
+        if (sortBy === "date") {
+          sort.date = order === "asc" ? 1 : -1;
+        } else if (sortBy === "amount") {
+          sort.amount = order === "asc" ? 1 : -1;
+        }
+
+        // Query by userEmail if provided
+        const query = userEmail ? { userEmail } : {};
+
+        const allTransactions = await transactions.find(query).sort(sort).toArray();
         res.json(allTransactions);
       } catch (err) {
         console.error(err);
@@ -43,7 +53,7 @@ async function run() {
       }
     });
 
-    // ✅ Get overview summary (total income, expenses, balance)
+    //  Get overview summary (total income, expenses, balance)
     app.get("/overview", async (req, res) => {
       try {
         const allTransactions = await transactions.find({}).toArray();
@@ -65,7 +75,7 @@ async function run() {
       }
     });
 
-    // ✅ Post (Add new transaction)
+    //  Post (Add new transaction)
     app.post("/add-transactions", async (req, res) => {
       try {
         const { amount, type, category, date, description, userEmail } = req.body;
@@ -90,7 +100,7 @@ async function run() {
       }
     });
 
-    // ✅ Delete transaction
+    //  Delete transaction
     app.delete("/transactions/:id", async (req, res) => {
       try {
         const id = req.params.id;
@@ -106,9 +116,8 @@ async function run() {
         res.status(500).json({ message: "Server error" });
       }
     });
-    
 
-    // ✅ Get single transaction (for View Details)
+    //  Get single transaction (for View Details)
     app.get("/transactions/:id", async (req, res) => {
       try {
         const id = req.params.id;
@@ -125,7 +134,7 @@ async function run() {
       }
     });
 
-    // ✅ Update transaction
+    //  Update transaction
     app.put("/transactions/update/:id", async (req, res) => {
       try {
         const id = req.params.id;
@@ -147,65 +156,58 @@ async function run() {
       }
     });
 
-    // ✅ Reports API (Summary + Charts)
-app.get("/reports/:email", async (req, res) => {
-  try {
-    const { email } = req.params;
-    const { month } = req.query; // optional: ?month=2025-11
+    //  Reports route
+    app.get("/reports/:email", async (req, res) => {
+      try {
+        const { email } = req.params;
+        const { month } = req.query; 
 
-    // build query
-    const query = { userEmail: email };
-    if (month) {
-      // Filter transactions by month (e.g., "2025-11")
-      query.date = { $regex: `^${month}` };
-    }
+        const query = { userEmail: email };
+        if (month) {
+          query.date = { $regex: `^${month}` };
+        }
 
-    const allTransactions = await transactions.find(query).toArray();
+        const allTransactions = await transactions.find(query).toArray();
 
-    // 🧮 Category summary (for Pie Chart)
-    const categorySummary = {};
-    allTransactions.forEach((t) => {
-      const cat = t.category || "Uncategorized";
-      categorySummary[cat] = (categorySummary[cat] || 0) + Number(t.amount || 0);
+        const categorySummary = {};
+        allTransactions.forEach((t) => {
+          const cat = t.category || "Uncategorized";
+          categorySummary[cat] = (categorySummary[cat] || 0) + Number(t.amount || 0);
+        });
+
+        const monthlySummary = {};
+        allTransactions.forEach((t) => {
+          const monthKey = t.date.slice(0, 7);
+          monthlySummary[monthKey] = (monthlySummary[monthKey] || 0) + Number(t.amount || 0);
+        });
+
+        const totalIncome = allTransactions
+          .filter((t) => t.type === "Income")
+          .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+        const totalExpenses = allTransactions
+          .filter((t) => t.type === "Expense")
+          .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+        const totalBalance = totalIncome - totalExpenses;
+
+        res.json({
+          totalIncome,
+          totalExpenses,
+          totalBalance,
+          categorySummary,
+          monthlySummary,
+        });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error" });
+      }
     });
 
-    // 🧮 Monthly totals (for Bar Chart)
-    const monthlySummary = {};
-    allTransactions.forEach((t) => {
-      const monthKey = t.date.slice(0, 7); // YYYY-MM
-      monthlySummary[monthKey] = (monthlySummary[monthKey] || 0) + Number(t.amount || 0);
-    });
-
-    // 🧮 Totals
-    const totalIncome = allTransactions
-      .filter((t) => t.type === "Income")
-      .reduce((sum, t) => sum + Number(t.amount || 0), 0);
-
-    const totalExpenses = allTransactions
-      .filter((t) => t.type === "Expense")
-      .reduce((sum, t) => sum + Number(t.amount || 0), 0);
-
-    const totalBalance = totalIncome - totalExpenses;
-
-    res.json({
-      totalIncome,
-      totalExpenses,
-      totalBalance,
-      categorySummary,
-      monthlySummary,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-
-    // ✅ Ping test
     await client.db("admin").command({ ping: 1 });
     console.log("✅ MongoDB connected successfully!");
   } finally {
-    // keep the connection open
+    // nothing
   }
 }
 
