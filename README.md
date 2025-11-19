@@ -1,5 +1,7 @@
 # FinEase 💰
 
+live link:  https://fin-ease-server-sigma.vercel.app/
+
 
 
 ## Overview
